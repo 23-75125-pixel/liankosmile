@@ -159,8 +159,13 @@
   @media (max-width: 760px) {
     #login-screen { grid-template-columns: 1fr; }
     .login-right { display: none; }
-    .login-left { padding: 32px; }
+    .login-left {
+      padding: 32px 24px;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
     .login-left .brand-row { position: static; margin-bottom: 40px; }
+    .login-form-wrap { max-width: 100%; width: 100%; }
   }
 
   /* ---------------- App shell ---------------- */
@@ -622,20 +627,434 @@
     100% { box-shadow: 0 0 0 0 rgba(46,158,91,0); }
   }
 
-  /* Responsive: landscape laptop is the primary target; tuck the sidebar
-     into icon-only mode on narrower windows instead of breaking layout */
-  @media (max-width: 900px) {
-    .shell-grid { grid-template-columns: 84px 1fr; }
-    .brand .word, .nav-item span.label { display: none; }
-    .brand { justify-content: center; }
-    .nav-item { justify-content: center; padding: 12px; }
+  /* Menu button (mobile) */
+  .menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    color: var(--text-main);
+  }
+  .menu-btn svg { width: 20px; height: 20px; }
+  .menu-btn:hover { background: #F4EEF7; }
+  .topbar-start {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
   }
 
-  @media (max-width: 620px) {
-    .topbar { padding: 16px; }
-    .page { padding: 18px; }
-    .stat-card { width: 100%; }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 10, 25, 0.4);
+    z-index: 40;
   }
+  .sidebar-backdrop.open { display: block; }
+
+  /* Tables: horizontal scroll on narrow screens */
+  .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll table { min-width: 520px; }
+
+  /* ---- Responsive breakpoints ---- */
+
+  /* Tablet: icon-only sidebar */
+  @media (max-width: 1024px) {
+    .shell-grid { grid-template-columns: 84px 1fr; }
+    .brand .word, .nav-item span.label { display: none; }
+    .brand { justify-content: center; padding-left: 0; padding-right: 0; }
+    .nav-item { justify-content: center; padding: 12px; }
+    .sidebar { padding: 20px 12px; }
+    .topbar { padding: 18px 20px; gap: 14px; }
+    .page { padding: 22px 20px 32px; }
+    .stat-card { width: min(100%, 240px); }
+    .search-wrap { max-width: 260px; min-width: 140px; }
+  }
+
+  /* Large phone / small tablet: drawer sidebar */
+  @media (max-width: 768px) {
+    .menu-btn { display: inline-flex; }
+
+    .shell-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: min(280px, 86vw);
+      z-index: 50;
+      transform: translateX(-105%);
+      transition: transform 0.22s ease;
+      box-shadow: 8px 0 30px rgba(20, 10, 25, 0.12);
+      padding: 22px 18px;
+      overflow-y: auto;
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    .brand .word, .nav-item span.label { display: inline; }
+    .brand { justify-content: flex-start; }
+    .nav-item { justify-content: flex-start; padding: 12px 14px; }
+
+    .topbar {
+      padding: 14px 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .topbar h1 { font-size: 18px; }
+    .search-wrap {
+      order: 3;
+      flex: 1 1 100%;
+      max-width: none;
+      min-width: 0;
+    }
+    .admin-chip .label { display: none; }
+    .logout-btn span.logout-text { display: none; }
+    .logout-btn { padding: 8px 10px; }
+
+    .page { padding: 16px 14px 28px; }
+    .stat-row { gap: 12px; }
+    .stat-card {
+      width: 100%;
+      min-height: 120px;
+      padding: 18px;
+    }
+    .stat-card .stat-value { font-size: 34px; }
+
+    thead th, tbody td { padding: 12px 14px; font-size: 12.5px; }
+    .status-actions { gap: 5px; }
+    .status-btn { padding: 6px 12px; font-size: 11.5px; }
+
+    .gallery-upload-card { padding: 16px; }
+    .gallery-list { grid-template-columns: 1fr; }
+    .invite-row { flex-direction: column; }
+    .invite-btn { width: 100%; }
+
+    .modal-card {
+      max-width: 100%;
+      padding: 22px 18px 20px;
+      max-height: 92vh;
+    }
+  }
+
+  /* Small phones */
+  @media (max-width: 480px) {
+    .login-left { padding: 24px 20px 36px; }
+    .login-form-wrap h2 { font-size: 20px; }
+    .login-left .brand-row { margin-bottom: 28px; }
+
+    .topbar h1 { font-size: 16.5px; }
+    .topbar .subtitle { font-size: 11.5px; }
+    .admin-avatar { width: 34px; height: 34px; font-size: 12px; }
+
+    .stat-card .stat-label { font-size: 13.5px; }
+    .stat-card .stat-value { font-size: 30px; }
+
+    .table-scroll table { min-width: 480px; }
+    .gallery-grid-form { grid-template-columns: 1fr; }
+    .modal-actions { flex-direction: column; }
+    .modal-btn { width: 100%; }
+  }
+
+  /* Very small / landscape phone height */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .login-left { padding: 20px 28px; }
+    .login-left .brand-row { position: static; margin-bottom: 12px; }
+    .sidebar { padding-top: 12px; }
+  }
+
+  /* Prevent horizontal page scroll */
+  html, body { overflow-x: hidden; max-width: 100vw; }
+  img, video, svg { max-width: 100%; height: auto; }
+  .sidebar img { max-width: none; }
+
+  /* Gallery */
+  .gallery-upload-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 22px;
+  }
+  .gallery-upload-card h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .gallery-upload-card .hint {
+    font-size: 12.5px;
+    color: var(--text-sub);
+    margin-bottom: 18px;
+  }
+  .gallery-grid-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .gallery-file-box {
+    border: 1.5px dashed #D5CFE0;
+    border-radius: var(--radius-md);
+    padding: 16px;
+    text-align: center;
+    background: #FBFAFC;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .gallery-file-box:hover { border-color: var(--purple-light); background: #F7F1FA; }
+  .gallery-file-box.has-file { border-style: solid; border-color: var(--purple); }
+  .gallery-file-box img {
+    max-width: 100%;
+    max-height: 110px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+  .gallery-file-box .label-title { font-size: 13px; font-weight: 700; color: var(--text-main); }
+  .gallery-file-box .label-sub { font-size: 11.5px; color: var(--text-sub); }
+  .gallery-caption-row { margin-top: 16px; }
+  .gallery-caption-row label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+  .gallery-caption-row input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    outline: none;
+    background: #FBFAFC;
+  }
+  .gallery-caption-row input:focus { border-color: var(--purple-light); }
+  .gallery-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .gallery-upload-btn {
+    padding: 12px 22px;
+    border: none;
+    border-radius: 999px;
+    background: var(--purple);
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .gallery-upload-btn:disabled { opacity: .6; cursor: default; }
+  .gallery-upload-btn:hover:not(:disabled) { opacity: .9; }
+  .gallery-msg {
+    font-size: 12.5px;
+    display: none;
+  }
+  .gallery-msg.error { color: #B3264D; display: block; }
+  .gallery-msg.success { color: #1F8A4C; display: block; }
+  .gallery-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .gallery-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .gallery-card .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    background: var(--line);
+  }
+  .gallery-card .pair .side {
+    position: relative;
+    aspect-ratio: 1;
+    background: #F0EDF3;
+  }
+  .gallery-card .pair img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .gallery-card .pair .tag {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .gallery-card .meta {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .gallery-card .meta .cap {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gallery-card .meta .del {
+    border: none;
+    background: #FBEFF4;
+    color: #B3264D;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .gallery-card .meta .del:hover { background: #F5D6E2; }
+  .gallery-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-sub);
+    font-size: 13.5px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+  }
+  @media (max-width: 620px) {
+    .gallery-grid-form { grid-template-columns: 1fr; }
+  }
+
+
+  /* Password toggle */
+  .password-wrap {
+    position: relative;
+  }
+  .password-wrap input {
+    padding-right: 48px !important;
+  }
+  .password-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,.75);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 6px;
+  }
+  .password-toggle:hover { color: #fff; }
+
+  .status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .status-btn.approve-active {
+    background: #1F8A4C;
+    color: #fff;
+  }
+  .status-btn.approve-active:hover { background: #176B3B; }
+  .status-btn.reject-active {
+    background: #FBEFF4;
+    color: #B3264D;
+  }
+  .status-btn.reject-active:hover { background: #F5D6E2; }
+  .status-btn.complete-active {
+    background: var(--purple);
+    color: #fff;
+  }
+  .status-btn.complete-active:hover { background: var(--purple-dark); }
+  .status-btn.delete-active {
+    background: #FBEFF4;
+    color: #B3264D;
+  }
+  .status-btn.delete-active:hover { background: #F5D6E2; }
+  .status-pill {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .status-pill.pending { background: #FFF4E5; color: #C47A00; }
+  .status-pill.confirmed { background: #EBF7EF; color: #1F8A4C; }
+  .status-pill.completed { background: #E9E6ED; color: #6B6570; }
+  .status-pill.cancelled { background: #FBEFF4; color: #B3264D; }
+
+  .invite-box {
+    margin-top: 8px;
+    padding: 14px;
+    background: #F7F1FA;
+    border-radius: 10px;
+  }
+  .invite-box .invite-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--purple-dark);
+    margin-bottom: 6px;
+  }
+  .invite-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .invite-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    outline: none;
+    background: #fff;
+  }
+  .invite-row input:focus { border-color: var(--purple-light); }
+  .invite-btn {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 999px;
+    background: var(--purple);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .invite-btn:disabled { opacity: .6; cursor: default; }
+  .invite-btn:hover:not(:disabled) { opacity: .9; }
+
 </style>
 </head>
 <body>
@@ -656,7 +1075,10 @@
         <input id="login-email" type="email" placeholder="Email" autocomplete="username" />
 
         <label for="login-password">Password</label>
-        <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
+        <div class="password-wrap">
+          <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
+          <button type="button" class="password-toggle" id="toggle-password" aria-label="Show password">Show</button>
+        </div>
 
         <button id="login-btn">Login</button>
         <div id="login-error"></div>
@@ -673,6 +1095,7 @@
 
   <!-- ======================= APP SHELL ======================= -->
   <div id="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="shell-grid">
 
       <aside class="sidebar">
@@ -694,14 +1117,23 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 4v12H4z"/><path d="M9 9h7M9 13h7M9 17h4"/></svg>
             <span class="label">Transactions</span>
           </div>
+          <div class="nav-item" data-page="gallery">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span class="label">Gallery</span>
+          </div>
         </nav>
       </aside>
 
       <div class="content">
         <header class="topbar">
-          <div>
-            <h1 id="page-title">Dashboard</h1>
-            <div class="subtitle" id="page-date">Today, —</div>
+          <div class="topbar-start">
+            <button type="button" class="menu-btn" id="menu-btn" aria-label="Open menu">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div>
+              <h1 id="page-title">Dashboard</h1>
+              <div class="subtitle" id="page-date">Today, —</div>
+            </div>
           </div>
 
           <div class="search-wrap">
@@ -714,7 +1146,7 @@
             <div class="label" id="admin-label" title="Account settings">Admin</div>
             <button class="logout-btn" id="logout-btn" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-              Logout
+              <span class="logout-text">Logout</span>
             </button>
           </div>
         </header>
@@ -736,28 +1168,63 @@
         <!-- ---------- Appointment Management page ---------- -->
         <section class="page" id="page-appointment">
           <div class="table-card">
-            <table>
-              <thead>
-                <tr><th>Name</th><th>Date</th><th>Time</th><th>Status</th></tr>
-              </thead>
-              <tbody id="appointment-rows">
-                <tr class="empty-row"><td colspan="4">Loading…</td></tr>
-              </tbody>
-            </table>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Name</th><th>Date</th><th>Time</th><th>Status</th></tr>
+                </thead>
+                <tbody id="appointment-rows">
+                  <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
         <!-- ---------- Transactions page ---------- -->
         <section class="page" id="page-transactions">
           <div class="table-card">
-            <table>
-              <thead>
-                <tr><th>Name</th><th>Date</th><th>Time</th><th>Status</th></tr>
-              </thead>
-              <tbody id="transactions-rows">
-                <tr class="empty-row"><td colspan="4">Loading…</td></tr>
-              </tbody>
-            </table>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Name</th><th>Date</th><th>Time</th><th>Status</th></tr>
+                </thead>
+                <tbody id="transactions-rows">
+                  <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- Before & After Gallery page ---------- -->
+        <section class="page" id="page-gallery">
+          <div class="gallery-upload-card">
+            <h3>Upload client before &amp; after</h3>
+            <div class="hint">Add teeth procedure photos (e.g. after cleaning / whitening). These appear on every patient&rsquo;s Home overview in the mobile app.</div>
+            <div class="gallery-grid-form">
+              <div class="gallery-file-box" id="before-box" role="button" tabindex="0">
+                <div class="label-title">Before photo</div>
+                <div class="label-sub">Click to choose image</div>
+                <input type="file" id="before-file" accept="image/*" style="display:none" />
+              </div>
+              <div class="gallery-file-box" id="after-box" role="button" tabindex="0">
+                <div class="label-title">After photo</div>
+                <div class="label-sub">Click to choose image</div>
+                <input type="file" id="after-file" accept="image/*" style="display:none" />
+              </div>
+            </div>
+            <div class="gallery-caption-row">
+              <label for="gallery-caption">Caption (optional)</label>
+              <input id="gallery-caption" type="text" placeholder="e.g. Teeth cleaning &amp; whitening — March 2026" />
+            </div>
+            <div class="gallery-actions">
+              <button class="gallery-upload-btn" id="gallery-upload-btn" type="button">Upload pair</button>
+              <span class="gallery-msg" id="gallery-msg"></span>
+            </div>
+          </div>
+          <div id="gallery-list" class="gallery-list">
+            <div class="gallery-empty">Loading gallery…</div>
           </div>
         </section>
 
@@ -799,6 +1266,21 @@
         <label for="settings-specialization">Specialization</label>
         <textarea id="settings-specialization" placeholder="General Dentistry, Orthodontics, Prosthodontist"></textarea>
         <div class="field-hint">Separate multiple specializations with a comma.</div>
+      </div>
+
+      <div class="modal-field" style="margin-top:8px;padding:12px 14px;background:#F7F1FA;border-radius:10px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--purple-dark);margin-bottom:4px;">Client before &amp; after photos</div>
+        <div class="field-hint" style="margin:0;">Upload teeth procedure photos from the <strong>Gallery</strong> page in the sidebar. They show on every patient&rsquo;s Home overview in the app.</div>
+      </div>
+
+      <div class="invite-box">
+        <div class="invite-title">Invite admin / dentist</div>
+        <div class="field-hint" style="margin:0 0 6px;">Enter an email of an account that already signed up in the Lianko app. Their role will be set to dentist so they can access this admin dashboard.</div>
+        <div class="invite-row">
+          <input id="invite-email" type="email" placeholder="colleague@email.com" />
+          <button type="button" class="invite-btn" id="invite-btn">Promote</button>
+        </div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Tip: ask them to create an account in the mobile app first, then promote them here.</div>
       </div>
 
       <div class="modal-actions">
@@ -866,7 +1348,8 @@
     var PAGE_META = {
       dashboard: { title: "Dashboard" },
       appointment: { title: "Appointment Management" },
-      transactions: { title: "Transactions" }
+      transactions: { title: "Transactions" },
+      gallery: { title: "Before & After Gallery" }
     };
 
     var today = new Date();
@@ -895,6 +1378,7 @@
         navItems.forEach(function (n) { n.classList.toggle("active", n === item); });
         pages.forEach(function (p) { p.classList.toggle("active", p.id === "page-" + page); });
         pageTitle.textContent = PAGE_META[page].title;
+        if (page === "gallery") loadGallery();
         renderAll();
       });
     });
@@ -980,6 +1464,7 @@
 
       loadAppointments();
       subscribeRealtime();
+      loadGallery();
     }
 
     // ---------------- Logout ----------------
@@ -1149,18 +1634,31 @@
         .subscribe();
     }
 
-    function markDone(id) {
-      sb.from("appointments").update({ status: "completed" }).eq("id", id).then(function (res) {
+    function updateAppointmentStatus(id, status) {
+      sb.from("appointments").update({ status: status }).eq("id", id).then(function (res) {
         if (res.error) {
           alert("Couldn't update this appointment: " + res.error.message);
           return;
         }
-        // Realtime subscription will refresh the tables; refresh right away too
-        // in case the realtime event is delayed.
         loadAppointments();
       });
     }
-    window.__liankoMarkDone = markDone;
+
+    function deleteAppointment(id) {
+      if (!confirm("Delete this transaction permanently?")) return;
+      sb.from("appointments").delete().eq("id", id).then(function (res) {
+        if (res.error) {
+          alert("Couldn't delete: " + res.error.message);
+          return;
+        }
+        loadAppointments();
+      });
+    }
+
+    window.__liankoApprove = function (id) { updateAppointmentStatus(id, "confirmed"); };
+    window.__liankoReject = function (id) { updateAppointmentStatus(id, "cancelled"); };
+    window.__liankoComplete = function (id) { updateAppointmentStatus(id, "completed"); };
+    window.__liankoDeleteAppt = function (id) { deleteAppointment(id); };
 
     // ---------------- Rendering ----------------
     function matchesSearch(row) {
@@ -1184,12 +1682,27 @@
       filtered.forEach(function (row) {
         var name = (row.profiles && row.profiles.full_name) || "Unknown patient";
         var tr = document.createElement("tr");
+        var status = (row.status || "pending").toLowerCase();
+        var btnHtml = "";
 
-        var btnHtml;
         if (mode === "pending") {
-          btnHtml = '<button class="status-btn done-active" onclick="__liankoMarkDone(' + row.id + ')">Done</button>';
+          var pillClass = status === "confirmed" ? "confirmed" : "pending";
+          var pillLabel = status === "confirmed" ? "Confirmed" : "Pending";
+          btnHtml = '<div class="status-actions">';
+          btnHtml += '<span class="status-pill ' + pillClass + '">' + pillLabel + '</span>';
+          if (status === "pending") {
+            btnHtml += '<button class="status-btn approve-active" onclick="__liankoApprove(' + row.id + ')">Approve</button>';
+            btnHtml += '<button class="status-btn reject-active" onclick="__liankoReject(' + row.id + ')">Reject</button>';
+          } else if (status === "confirmed") {
+            btnHtml += '<button class="status-btn complete-active" onclick="__liankoComplete(' + row.id + ')">Complete</button>';
+            btnHtml += '<button class="status-btn reject-active" onclick="__liankoReject(' + row.id + ')">Reject</button>';
+          }
+          btnHtml += '</div>';
         } else {
-          btnHtml = '<button class="status-btn done-static" disabled>Done</button>';
+          btnHtml = '<div class="status-actions">';
+          btnHtml += '<button class="status-btn done-static" disabled>Done</button>';
+          btnHtml += '<button class="status-btn delete-active" onclick="__liankoDeleteAppt(' + row.id + ')">Delete</button>';
+          btnHtml += '</div>';
         }
 
         tr.innerHTML =
@@ -1208,8 +1721,14 @@
     }
 
     function renderAll() {
-      var pending = allAppointments.filter(function (a) { return a.status !== "completed" && a.status !== "cancelled"; });
-      var completed = allAppointments.filter(function (a) { return a.status === "completed"; });
+      var pending = allAppointments.filter(function (a) {
+        var s = (a.status || "").toLowerCase();
+        return s !== "completed" && s !== "cancelled" && s !== "rejected";
+      });
+      var completed = allAppointments.filter(function (a) {
+        var s = (a.status || "").toLowerCase();
+        return s === "completed" || s === "done";
+      });
 
       renderTable(appointmentRows, pending, "pending");
       renderTable(transactionsRows, completed, "done");
@@ -1228,6 +1747,245 @@
       statTransactions.textContent = completedThisMonth.length;
       statPending.textContent = pending.length;
     }
+
+   
+
+    // Mobile sidebar drawer
+    var menuBtn = document.getElementById("menu-btn");
+    var sidebarEl = document.querySelector(".sidebar");
+    var sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+    function openSidebar() {
+      if (sidebarEl) sidebarEl.classList.add("open");
+      if (sidebarBackdrop) sidebarBackdrop.classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closeSidebar() {
+      if (sidebarEl) sidebarEl.classList.remove("open");
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove("open");
+      document.body.style.overflow = "";
+    }
+    if (menuBtn) menuBtn.addEventListener("click", openSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
+    if (sidebarEl) {
+      sidebarEl.querySelectorAll(".nav-item").forEach(function (item) {
+        item.addEventListener("click", function () {
+          if (window.matchMedia("(max-width: 768px)").matches) closeSidebar();
+        });
+      });
+    }
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 768) closeSidebar();
+    });
+
+    // Password show/hide
+    var togglePasswordBtn = document.getElementById("toggle-password");
+    if (togglePasswordBtn && loginPassword) {
+      togglePasswordBtn.addEventListener("click", function () {
+        var showing = loginPassword.type === "text";
+        loginPassword.type = showing ? "password" : "text";
+        togglePasswordBtn.textContent = showing ? "Show" : "Hide";
+      });
+    }
+
+    // Invite / promote admin-dentist by email
+    var inviteEmailInput = document.getElementById("invite-email");
+    var inviteBtn = document.getElementById("invite-btn");
+    var inviteHint = document.getElementById("invite-hint");
+    if (inviteBtn) {
+      inviteBtn.addEventListener("click", function () {
+        var email = (inviteEmailInput && inviteEmailInput.value || "").trim().toLowerCase();
+        if (!email || email.indexOf("@") < 1) {
+          showSettingsMsg("Enter a valid email address.", true);
+          return;
+        }
+        inviteBtn.disabled = true;
+        inviteBtn.textContent = "Promoting…";
+        // Promote an existing profile (user must have signed up in the app first)
+        sb.from("profiles")
+          .update({ role: "dentist" })
+          .eq("email", email)
+          .select("id, full_name, email, role")
+          .then(function (res) {
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = "Promote";
+            if (res.error) {
+              showSettingsMsg("Couldn't promote: " + res.error.message, true);
+              return;
+            }
+            var rows = res.data || [];
+            if (rows.length === 0) {
+              showSettingsMsg("No account found with that email. Ask them to sign up in the Lianko app first, then promote again.", true);
+              if (inviteHint) inviteHint.textContent = "No profile matched \"" + email + "\". They need an app account first.";
+              return;
+            }
+            showSettingsMsg("Success! " + (rows[0].full_name || email) + " can now sign in to this admin dashboard.", false);
+            if (inviteEmailInput) inviteEmailInput.value = "";
+            if (inviteHint) inviteHint.textContent = "Promoted " + email + " to dentist/admin.";
+          });
+      });
+    }
+
+    // ---------------- Before & After Gallery ----------------
+    var beforeFileInput = document.getElementById("before-file");
+    var afterFileInput = document.getElementById("after-file");
+    var beforeBox = document.getElementById("before-box");
+    var afterBox = document.getElementById("after-box");
+    var galleryCaption = document.getElementById("gallery-caption");
+    var galleryUploadBtn = document.getElementById("gallery-upload-btn");
+    var galleryMsg = document.getElementById("gallery-msg");
+    var galleryList = document.getElementById("gallery-list");
+    var selectedBeforeFile = null;
+    var selectedAfterFile = null;
+
+    function showGalleryMsg(text, isError) {
+      if (!galleryMsg) return;
+      galleryMsg.textContent = text;
+      galleryMsg.className = "gallery-msg " + (isError ? "error" : "success");
+    }
+
+    function setFilePreview(box, file) {
+      var existing = box.querySelector("img");
+      if (existing) existing.remove();
+      var sub = box.querySelector(".label-sub");
+      if (!file) {
+        box.classList.remove("has-file");
+        if (sub) sub.textContent = "Click to choose image";
+        return;
+      }
+      box.classList.add("has-file");
+      if (sub) sub.textContent = file.name;
+      var img = document.createElement("img");
+      img.alt = "";
+      img.src = URL.createObjectURL(file);
+      box.appendChild(img);
+    }
+
+    if (beforeBox) {
+      beforeBox.addEventListener("click", function () { beforeFileInput.click(); });
+      beforeBox.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") beforeFileInput.click(); });
+    }
+    if (afterBox) {
+      afterBox.addEventListener("click", function () { afterFileInput.click(); });
+      afterBox.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") afterFileInput.click(); });
+    }
+    if (beforeFileInput) {
+      beforeFileInput.addEventListener("change", function () {
+        selectedBeforeFile = beforeFileInput.files && beforeFileInput.files[0] ? beforeFileInput.files[0] : null;
+        setFilePreview(beforeBox, selectedBeforeFile);
+      });
+    }
+    if (afterFileInput) {
+      afterFileInput.addEventListener("change", function () {
+        selectedAfterFile = afterFileInput.files && afterFileInput.files[0] ? afterFileInput.files[0] : null;
+        setFilePreview(afterBox, selectedAfterFile);
+      });
+    }
+
+    function uploadImageToBucket(file, folderPrefix) {
+      var ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      var path = folderPrefix + "/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
+      return sb.storage.from("before-after").upload(path, file, { upsert: false }).then(function (res) {
+        if (res.error) throw new Error(res.error.message);
+        return sb.storage.from("before-after").getPublicUrl(path).data.publicUrl;
+      });
+    }
+
+    function loadGallery() {
+      if (!galleryList) return;
+      sb.from("before_after_photos")
+        .select("id, before_url, after_url, caption, created_at")
+        .order("created_at", { ascending: false })
+        .then(function (res) {
+          if (res.error) {
+            galleryList.innerHTML = '<div class="gallery-empty">Couldn\'t load gallery: ' + escapeHtml(res.error.message) + "</div>";
+            return;
+          }
+          var rows = res.data || [];
+          if (rows.length === 0) {
+            galleryList.innerHTML = '<div class="gallery-empty">No before &amp; after photos yet. Upload your first pair above — patients will see it on their Home screen.</div>';
+            return;
+          }
+          galleryList.innerHTML = "";
+          rows.forEach(function (row) {
+            var card = document.createElement("div");
+            card.className = "gallery-card";
+            card.innerHTML =
+              '<div class="pair">' +
+                '<div class="side"><span class="tag">Before</span><img src="' + escapeHtml(row.before_url) + '" alt="Before" /></div>' +
+                '<div class="side"><span class="tag">After</span><img src="' + escapeHtml(row.after_url) + '" alt="After" /></div>' +
+              '</div>' +
+              '<div class="meta">' +
+                '<div class="cap">' + escapeHtml(row.caption || "Smile transformation") + '</div>' +
+                '<button type="button" class="del" data-id="' + row.id + '">Delete</button>' +
+              '</div>';
+            card.querySelector(".del").addEventListener("click", function () {
+              if (!confirm("Delete this before & after pair?")) return;
+              sb.from("before_after_photos").delete().eq("id", row.id).then(function (delRes) {
+                if (delRes.error) {
+                  alert("Delete failed: " + delRes.error.message);
+                  return;
+                }
+                loadGallery();
+              });
+            });
+            galleryList.appendChild(card);
+          });
+        });
+    }
+
+    if (galleryUploadBtn) {
+      galleryUploadBtn.addEventListener("click", function () {
+        if (!currentProfile) {
+          showGalleryMsg("Please sign in first.", true);
+          return;
+        }
+        if (!selectedBeforeFile || !selectedAfterFile) {
+          showGalleryMsg("Choose both a before and an after photo.", true);
+          return;
+        }
+        galleryUploadBtn.disabled = true;
+        galleryUploadBtn.textContent = "Uploading…";
+        showGalleryMsg("Uploading photos…", false);
+
+        var folder = currentProfile.id;
+        Promise.all([
+          uploadImageToBucket(selectedBeforeFile, folder),
+          uploadImageToBucket(selectedAfterFile, folder)
+        ]).then(function (urls) {
+          return sb.from("before_after_photos").insert({
+            dentist_id: currentProfile.id,
+            before_url: urls[0],
+            after_url: urls[1],
+            caption: (galleryCaption.value || "").trim() || null
+          });
+        }).then(function (insRes) {
+          galleryUploadBtn.disabled = false;
+          galleryUploadBtn.textContent = "Upload pair";
+          if (insRes.error) {
+            showGalleryMsg("Save failed: " + insRes.error.message, true);
+            return;
+          }
+          selectedBeforeFile = null;
+          selectedAfterFile = null;
+          if (beforeFileInput) beforeFileInput.value = "";
+          if (afterFileInput) afterFileInput.value = "";
+          setFilePreview(beforeBox, null);
+          setFilePreview(afterBox, null);
+          galleryCaption.value = "";
+          showGalleryMsg("Uploaded! Patients will see this on their Home overview.", false);
+          loadGallery();
+        }).catch(function (err) {
+          galleryUploadBtn.disabled = false;
+          galleryUploadBtn.textContent = "Upload pair";
+          showGalleryMsg("Upload failed: " + (err.message || err), true);
+        });
+      });
+    }
+
+    // Load gallery when switching to the page
+    var originalNavHandlerDone = false;
+
   })();
   </script>
 </body>
