@@ -524,6 +524,27 @@
     flex-direction: column;
     justify-content: space-between;
     box-shadow: 0 10px 26px rgba(94, 31, 110, 0.22);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    border: none;
+    text-align: left;
+    font: inherit;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(94, 31, 110, 0.3);
+  }
+  .stat-card:active {
+    transform: translateY(0);
+    opacity: 0.92;
+  }
+  .stat-card .stat-hint {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.8;
+    margin-top: 6px;
   }
 
   .stat-card .stat-label {
@@ -1154,14 +1175,20 @@
         <!-- ---------- Dashboard page ---------- -->
         <section class="page active" id="page-dashboard">
           <div class="stat-row">
-            <div class="stat-card">
+            <button type="button" class="stat-card" id="stat-card-transactions" data-page="transactions" title="View transactions">
               <div class="stat-label" id="month-label">Total Transactions<br/>this month</div>
-              <div class="stat-value" id="stat-transactions">—</div>
-            </div>
-            <div class="stat-card">
+              <div>
+                <div class="stat-value" id="stat-transactions">—</div>
+                <div class="stat-hint">Tap to view →</div>
+              </div>
+            </button>
+            <button type="button" class="stat-card" id="stat-card-pending" data-page="appointment" title="View appointments">
               <div class="stat-label">Pending<br/>appointment</div>
-              <div class="stat-value" id="stat-pending">—</div>
-            </div>
+              <div>
+                <div class="stat-value" id="stat-pending">—</div>
+                <div class="stat-hint">Tap to view →</div>
+              </div>
+            </button>
           </div>
         </section>
 
@@ -1371,15 +1398,30 @@
     }
 
     // ---------------- Nav ----------------
+    function goToPage(page) {
+      if (!page || !PAGE_META[page]) return;
+      currentPage = page;
+      navItems.forEach(function (n) {
+        n.classList.toggle("active", n.getAttribute("data-page") === page);
+      });
+      pages.forEach(function (p) {
+        p.classList.toggle("active", p.id === "page-" + page);
+      });
+      pageTitle.textContent = PAGE_META[page].title;
+      if (page === "gallery") loadGallery();
+      renderAll();
+    }
+
     navItems.forEach(function (item) {
       item.addEventListener("click", function () {
-        var page = item.getAttribute("data-page");
-        currentPage = page;
-        navItems.forEach(function (n) { n.classList.toggle("active", n === item); });
-        pages.forEach(function (p) { p.classList.toggle("active", p.id === "page-" + page); });
-        pageTitle.textContent = PAGE_META[page].title;
-        if (page === "gallery") loadGallery();
-        renderAll();
+        goToPage(item.getAttribute("data-page"));
+      });
+    });
+
+    // Dashboard stat cards → jump to related tabs
+    document.querySelectorAll(".stat-card[data-page]").forEach(function (card) {
+      card.addEventListener("click", function () {
+        goToPage(card.getAttribute("data-page"));
       });
     });
 
