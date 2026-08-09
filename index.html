@@ -447,6 +447,63 @@
   .alert-card .alert-ok:hover { opacity: .9; }
   .alert-card.error-theme .alert-ok { background: #B3264D; }
 
+  /* Logout confirmation modal */
+  #logout-confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 10, 25, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 210;
+    padding: 20px;
+  }
+  #logout-confirm-overlay.open { display: flex; }
+  .logout-confirm-card {
+    background: #fff;
+    width: 100%;
+    max-width: 400px;
+    border-radius: var(--radius-lg);
+    padding: 28px 24px 22px;
+    box-shadow: 0 20px 60px rgba(20,10,25,.25);
+  }
+  .logout-confirm-card h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+  .logout-confirm-card p {
+    margin: 0 0 22px;
+    font-size: 13.5px;
+    color: var(--text-sub);
+    line-height: 1.45;
+  }
+  .logout-confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .logout-confirm-actions button {
+    min-width: 110px;
+    padding: 12px 16px;
+    border-radius: 999px;
+    border: none;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .logout-confirm-cancel {
+    background: #F3EDF7;
+    color: var(--text-main);
+  }
+  .logout-confirm-cancel:hover { background: #EADFF2; }
+  .logout-confirm-proceed {
+    background: #B3264D;
+    color: #fff;
+  }
+  .logout-confirm-proceed:hover { opacity: .92; }
+
   /* ---------------- Settings modal ---------------- */
   .modal-overlay {
     display: none;
@@ -1387,6 +1444,18 @@
     </div>
   </div>
 
+  <!-- ======================= LOGOUT CONFIRMATION MODAL ======================= -->
+  <div id="logout-confirm-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title">
+    <div class="logout-confirm-card">
+      <h3 id="logout-confirm-title">Log out?</h3>
+      <p>You will return to the sign-in screen after logout succeeds.</p>
+      <div class="logout-confirm-actions">
+        <button type="button" class="logout-confirm-cancel" id="logout-confirm-cancel">Cancel</button>
+        <button type="button" class="logout-confirm-proceed" id="logout-confirm-proceed">Log out</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ======================= ACCOUNT SETTINGS MODAL ======================= -->
   <div class="modal-overlay" id="settings-overlay">
     <div class="modal-card">
@@ -1493,6 +1562,10 @@
     var settingsAvatarInitials = document.getElementById("settings-avatar-initials");
     var settingsAvatarCaption = document.getElementById("settings-avatar-caption");
     var settingsAvatarInput = document.getElementById("settings-avatar-input");
+
+    var logoutConfirmOverlay = document.getElementById("logout-confirm-overlay");
+    var logoutConfirmCancel = document.getElementById("logout-confirm-cancel");
+    var logoutConfirmProceed = document.getElementById("logout-confirm-proceed");
 
     var currentProfile = null; // { id, full_name, email, specialization, avatar_url }
 
@@ -1603,6 +1676,28 @@
       });
     }
 
+    function showLogoutConfirmModal() {
+      if (!logoutConfirmOverlay) return;
+      logoutConfirmOverlay.classList.add("open");
+      if (logoutConfirmProceed) logoutConfirmProceed.focus();
+    }
+
+    function closeLogoutConfirmModal() {
+      if (!logoutConfirmOverlay) return;
+      logoutConfirmOverlay.classList.remove("open");
+    }
+
+    if (logoutConfirmCancel) logoutConfirmCancel.addEventListener("click", closeLogoutConfirmModal);
+    if (logoutConfirmProceed) logoutConfirmProceed.addEventListener("click", function () {
+      closeLogoutConfirmModal();
+      performLogout();
+    });
+    if (logoutConfirmOverlay) {
+      logoutConfirmOverlay.addEventListener("click", function (e) {
+        if (e.target === logoutConfirmOverlay) closeLogoutConfirmModal();
+      });
+    }
+
     // ---------------- Auth ----------------
     loginBtn.addEventListener("click", doLogin);
     loginPassword.addEventListener("keydown", function (e) { if (e.key === "Enter") doLogin(); });
@@ -1697,11 +1792,20 @@
 
     // ---------------- Logout ----------------
     logoutBtn.addEventListener("click", function () {
+      showLogoutConfirmModal();
+    });
+
+    function performLogout() {
       logoutBtn.disabled = true;
       sb.auth.signOut().then(function (res) {
         if (realtimeChannel) {
           sb.removeChannel(realtimeChannel);
           realtimeChannel = null;
+        }
+        if (res && res.error) {
+          logoutBtn.disabled = false;
+          showAlertModal("error", "Logout failed", res.error.message || "Please try again.");
+          return;
         }
         currentProfile = null;
         allAppointments = [];
@@ -1710,16 +1814,12 @@
         loginEmail.value = "";
         loginPassword.value = "";
         logoutBtn.disabled = false;
-        if (res && res.error) {
-          showAlertModal("error", "Logout failed", res.error.message || "Please try again.");
-          return;
-        }
         showAlertModal("success", "Logged out", "You have been logged out successfully.");
       }).catch(function (err) {
         logoutBtn.disabled = false;
         showAlertModal("error", "Logout failed", err.message || "Please try again.");
       });
-    });
+    }
 
     // ---------------- Account settings modal ----------------
     function openSettings() {
