@@ -380,6 +380,73 @@
 
   .logout-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 
+
+  /* Alert modal (login / logout feedback) */
+  #alert-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 10, 25, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  #alert-overlay.open { display: flex; }
+  .alert-card {
+    background: #fff;
+    width: 100%;
+    max-width: 360px;
+    border-radius: var(--radius-lg);
+    padding: 28px 24px 22px;
+    box-shadow: 0 20px 60px rgba(20,10,25,.25);
+    text-align: center;
+  }
+  .alert-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+  }
+  .alert-icon.success {
+    border: 3px solid #4CAF50;
+    color: #4CAF50;
+  }
+  .alert-icon.error {
+    border: 3px solid #B3264D;
+    color: #B3264D;
+  }
+  .alert-card h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+  .alert-card p {
+    margin: 0 0 20px;
+    font-size: 13.5px;
+    color: var(--text-sub);
+    line-height: 1.45;
+  }
+  .alert-card .alert-ok {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 999px;
+    background: var(--purple);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .alert-card .alert-ok:hover { opacity: .9; }
+  .alert-card.error-theme .alert-ok { background: #B3264D; }
+
   /* ---------------- Settings modal ---------------- */
   .modal-overlay {
     display: none;
@@ -1309,6 +1376,17 @@
     </div>
   </div>
 
+
+  <!-- ======================= ALERT MODAL ======================= -->
+  <div id="alert-overlay" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="alert-card" id="alert-card">
+      <div class="alert-icon success" id="alert-icon">✓</div>
+      <h3 id="alert-title">Success!</h3>
+      <p id="alert-message">Done.</p>
+      <button type="button" class="alert-ok" id="alert-ok">OK</button>
+    </div>
+  </div>
+
   <!-- ======================= ACCOUNT SETTINGS MODAL ======================= -->
   <div class="modal-overlay" id="settings-overlay">
     <div class="modal-card">
@@ -1362,7 +1440,7 @@
           <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Make sure UUID is correct before promotion </div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Make sure UUID is correct before promotion</div>
       </div>
 
       <div class="modal-actions">
@@ -1487,6 +1565,44 @@
       renderAll();
     });
 
+
+    // ---------------- Alert modal (success / error) ----------------
+    var alertOverlay = document.getElementById("alert-overlay");
+    var alertCard = document.getElementById("alert-card");
+    var alertIcon = document.getElementById("alert-icon");
+    var alertTitle = document.getElementById("alert-title");
+    var alertMessage = document.getElementById("alert-message");
+    var alertOk = document.getElementById("alert-ok");
+    var alertOnClose = null;
+
+    function showAlertModal(type, title, message, onClose) {
+      if (!alertOverlay) return;
+      alertOnClose = typeof onClose === "function" ? onClose : null;
+      var isError = type === "error";
+      if (alertIcon) {
+        alertIcon.className = "alert-icon " + (isError ? "error" : "success");
+        alertIcon.textContent = isError ? "!" : "✓";
+      }
+      if (alertCard) alertCard.className = "alert-card" + (isError ? " error-theme" : "");
+      if (alertTitle) alertTitle.textContent = title || (isError ? "Error" : "Success!");
+      if (alertMessage) alertMessage.textContent = message || "";
+      alertOverlay.classList.add("open");
+    }
+
+    function closeAlertModal() {
+      if (alertOverlay) alertOverlay.classList.remove("open");
+      var cb = alertOnClose;
+      alertOnClose = null;
+      if (cb) cb();
+    }
+
+    if (alertOk) alertOk.addEventListener("click", closeAlertModal);
+    if (alertOverlay) {
+      alertOverlay.addEventListener("click", function (e) {
+        if (e.target === alertOverlay) closeAlertModal();
+      });
+    }
+
     // ---------------- Auth ----------------
     loginBtn.addEventListener("click", doLogin);
     loginPassword.addEventListener("keydown", function (e) { if (e.key === "Enter") doLogin(); });
@@ -1502,8 +1618,10 @@
       loginBtn.textContent = "Signing in…";
       loginError.style.display = "none";
 
+      showLoginSuccessModal = true;
       sb.auth.signInWithPassword({ email: email, password: password }).then(function (res) {
         if (res.error) {
+          showLoginSuccessModal = false;
           showLoginError(res.error.message);
           resetLoginBtn();
           return;
@@ -1515,12 +1633,15 @@
     function showLoginError(msg) {
       loginError.textContent = msg;
       loginError.style.display = "block";
+      showAlertModal("error", "Login failed", msg);
     }
 
     function resetLoginBtn() {
       loginBtn.disabled = false;
       loginBtn.textContent = "Log in";
     }
+
+    var showLoginSuccessModal = false;
 
     function checkDentistRole(user) {
       sb.from("profiles").select("role, full_name, avatar_url, specialization").eq("id", user.id).maybeSingle()
@@ -1540,7 +1661,15 @@
           }
           res.data.id = user.id;
           res.data.email = user.email || "";
-          enterApp(res.data);
+          var profileData = res.data;
+          if (showLoginSuccessModal) {
+            showLoginSuccessModal = false;
+            showAlertModal("success", "Login successful!", "Welcome back" + (profileData.full_name ? ", " + profileData.full_name : "") + ".", function () {
+              enterApp(profileData);
+            });
+          } else {
+            enterApp(profileData);
+          }
         });
     }
 
@@ -1569,7 +1698,7 @@
     // ---------------- Logout ----------------
     logoutBtn.addEventListener("click", function () {
       logoutBtn.disabled = true;
-      sb.auth.signOut().then(function () {
+      sb.auth.signOut().then(function (res) {
         if (realtimeChannel) {
           sb.removeChannel(realtimeChannel);
           realtimeChannel = null;
@@ -1581,6 +1710,14 @@
         loginEmail.value = "";
         loginPassword.value = "";
         logoutBtn.disabled = false;
+        if (res && res.error) {
+          showAlertModal("error", "Logout failed", res.error.message || "Please try again.");
+          return;
+        }
+        showAlertModal("success", "Logged out", "You have been logged out successfully.");
+      }).catch(function (err) {
+        logoutBtn.disabled = false;
+        showAlertModal("error", "Logout failed", err.message || "Please try again.");
       });
     });
 
@@ -1632,6 +1769,11 @@
       settingsMsg.textContent = text;
       settingsMsg.className = "modal-msg " + (isError ? "error" : "success");
       settingsMsg.style.display = "block";
+      showAlertModal(
+        isError ? "error" : "success",
+        isError ? "Error" : "Success!",
+        text
+      );
     }
 
     settingsAvatar.addEventListener("click", function () {
@@ -1730,17 +1872,19 @@
     // After Google redirect, Supabase puts tokens in the URL hash/query.
     // getSession() below already resumes the session; also listen for auth changes.
     sb.auth.onAuthStateChange(function (event, session) {
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session && session.user) {
-        // Avoid double-enter if already in app
+      if (event === "SIGNED_IN" && session && session.user) {
         if (appShell && appShell.style.display === "block") return;
+        // Fresh sign-in (e.g. Google redirect) → show success modal
+        showLoginSuccessModal = true;
         checkDentistRole(session.user);
       }
     });
 
-    // On load, resume an existing session if there is one.
+    // On load, resume an existing session quietly (no success modal).
     sb.auth.getSession().then(function (res) {
       var session = res.data && res.data.session;
       if (session && session.user) {
+        showLoginSuccessModal = false;
         checkDentistRole(session.user);
       }
     });
@@ -1770,13 +1914,14 @@
         .subscribe();
     }
 
-    function updateAppointmentStatus(id, status) {
+    function updateAppointmentStatus(id, status, successTitle, successMsg) {
       sb.from("appointments").update({ status: status }).eq("id", id).then(function (res) {
         if (res.error) {
-          alert("Couldn't update this appointment: " + res.error.message);
+          showAlertModal("error", "Update failed", res.error.message || "Couldn't update this appointment.");
           return;
         }
         loadAppointments();
+        showAlertModal("success", successTitle || "Updated", successMsg || "Appointment status updated.");
       });
     }
 
@@ -1784,16 +1929,23 @@
       if (!confirm("Delete this transaction permanently?")) return;
       sb.from("appointments").delete().eq("id", id).then(function (res) {
         if (res.error) {
-          alert("Couldn't delete: " + res.error.message);
+          showAlertModal("error", "Delete failed", res.error.message || "Couldn't delete this transaction.");
           return;
         }
         loadAppointments();
+        showAlertModal("success", "Deleted", "Transaction removed successfully.");
       });
     }
 
-    window.__liankoApprove = function (id) { updateAppointmentStatus(id, "confirmed"); };
-    window.__liankoReject = function (id) { updateAppointmentStatus(id, "cancelled"); };
-    window.__liankoComplete = function (id) { updateAppointmentStatus(id, "completed"); };
+    window.__liankoApprove = function (id) {
+      updateAppointmentStatus(id, "confirmed", "Approved", "Appointment has been approved (confirmed).");
+    };
+    window.__liankoReject = function (id) {
+      updateAppointmentStatus(id, "cancelled", "Rejected", "Appointment has been rejected. The client can reschedule in the app.");
+    };
+    window.__liankoComplete = function (id) {
+      updateAppointmentStatus(id, "completed", "Completed", "Appointment marked as completed and moved to Transactions.");
+    };
     window.__liankoDeleteAppt = function (id) { deleteAppointment(id); };
 
     // ---------------- Rendering ----------------
@@ -2147,10 +2299,11 @@
               if (!confirm("Delete this before & after pair?")) return;
               sb.from("before_after_photos").delete().eq("id", row.id).then(function (delRes) {
                 if (delRes.error) {
-                  alert("Delete failed: " + delRes.error.message);
+                  showAlertModal("error", "Delete failed", delRes.error.message);
                   return;
                 }
                 loadGallery();
+                showAlertModal("success", "Deleted", "Gallery photo pair removed.");
               });
             });
             galleryList.appendChild(card);
@@ -2198,11 +2351,13 @@
           setFilePreview(afterBox, null);
           galleryCaption.value = "";
           showGalleryMsg("Uploaded! Patients will see this on their Home overview.", false);
+          showAlertModal("success", "Uploaded", "Before & after photos saved. Patients will see them on Home.");
           loadGallery();
         }).catch(function (err) {
           galleryUploadBtn.disabled = false;
           galleryUploadBtn.textContent = "Upload pair";
           showGalleryMsg("Upload failed: " + (err.message || err), true);
+          showAlertModal("error", "Upload failed", err.message || String(err));
         });
       });
     }
