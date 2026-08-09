@@ -1307,7 +1307,12 @@
           <input id="invite-email" type="email" placeholder="colleague@email.com" />
           <button type="button" class="invite-btn" id="invite-btn">Promote</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Tip: ask them to create an account in the mobile app first, then promote them here.</div>
+        <div class="field-hint" style="margin-top:10px;margin-bottom:4px;">If email lookup fails, paste their User UUID from Supabase → Authentication → Users:</div>
+        <div class="invite-row">
+          <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
+        </div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">If promote fails, run fix_promote_admin.sql in Supabase SQL Editor (email backfill + dentist update policy).</div>
       </div>
 
       <div class="modal-actions">
@@ -1790,7 +1795,7 @@
       statPending.textContent = pending.length;
     }
 
-   
+    
 
     // Mobile sidebar drawer
     var menuBtn = document.getElementById("menu-btn");
@@ -1834,6 +1839,34 @@
     var inviteEmailInput = document.getElementById("invite-email");
     var inviteBtn = document.getElementById("invite-btn");
     var inviteHint = document.getElementById("invite-hint");
+
+    function promoteProfileById(profileId, email, displayName) {
+      return sb.from("profiles")
+        .update({ role: "dentist", email: email })
+        .eq("id", profileId)
+        .select("id, full_name, email, role")
+        .then(function (upd) {
+          inviteBtn.disabled = false;
+          inviteBtn.textContent = "Promote";
+          if (upd.error) {
+            showSettingsMsg("Couldn't promote: " + upd.error.message + " (If this is an RLS error, run the admin promote SQL in Supabase.)", true);
+            return;
+          }
+          var rows = upd.data || [];
+          if (rows.length === 0) {
+            showSettingsMsg(
+              "Update blocked or no row changed. In Supabase SQL Editor run: " +
+              "create policy for dentist to update profiles (see supabase/admin_promote_policy.sql).",
+              true
+            );
+            return;
+          }
+          showSettingsMsg("Success! " + (rows[0].full_name || displayName || email) + " is now a dentist/admin and can sign in here.", false);
+          if (inviteEmailInput) inviteEmailInput.value = "";
+          if (inviteHint) inviteHint.textContent = "Promoted " + email + " to dentist/admin.";
+        });
+    }
+
     if (inviteBtn) {
       inviteBtn.addEventListener("click", function () {
         var email = (inviteEmailInput && inviteEmailInput.value || "").trim().toLowerCase();
@@ -1843,27 +1876,86 @@
         }
         inviteBtn.disabled = true;
         inviteBtn.textContent = "Promoting…";
-        // Promote an existing profile (user must have signed up in the app first)
+        if (inviteHint) inviteHint.textContent = "Looking up profile…";
+
+        // 1) Find by profiles.email (case-insensitive)
         sb.from("profiles")
-          .update({ role: "dentist" })
-          .eq("email", email)
+          .select("id, full_name, email, role")
+          .ilike("email", email)
+          .then(function (findRes) {
+            if (findRes.error) {
+              inviteBtn.disabled = false;
+              inviteBtn.textContent = "Promote";
+              showSettingsMsg("Lookup failed: " + findRes.error.message, true);
+              return;
+            }
+            var found = findRes.data || [];
+            if (found.length > 0) {
+              return promoteProfileById(found[0].id, email, found[0].full_name);
+            }
+
+            // 2) Email column may be empty — list profiles the dentist can read and match nothing;
+            //    try ilike on full_name is useless. Fall back: fetch recent profiles and
+            //    also try exact eq in case ilike is restricted.
+            return sb.from("profiles")
+              .select("id, full_name, email, role")
+              .eq("email", email)
+              .then(function (find2) {
+                var found2 = (find2 && find2.data) || [];
+                if (found2.length > 0) {
+                  return promoteProfileById(found2[0].id, email, found2[0].full_name);
+                }
+
+                // 3) Still nothing — profile.email likely NULL. Ask user to run backfill SQL
+                //    or promote by pasting the user's UUID from Supabase Authentication.
+                inviteBtn.disabled = false;
+                inviteBtn.textContent = "Promote";
+                showSettingsMsg(
+                  "No profile with email \"" + email + "\" found. " +
+                  "Usually the account exists in Auth but profiles.email is empty. " +
+                  "Run this in Supabase SQL Editor, then Promote again:\n" +
+                  "update public.profiles p set email = u.email from auth.users u where u.id = p.id and (p.email is null or p.email = '');",
+                  true
+                );
+                if (inviteHint) {
+                  inviteHint.textContent =
+                    "Tip: Supabase → SQL → run email backfill, then Promote again. Or promote by UUID below.";
+                }
+              });
+          });
+      });
+    }
+
+    // Optional: promote by user UUID (from Supabase → Authentication → Users)
+    var inviteUuidInput = document.getElementById("invite-uuid");
+    var inviteUuidBtn = document.getElementById("invite-uuid-btn");
+    if (inviteUuidBtn && inviteUuidInput) {
+      inviteUuidBtn.addEventListener("click", function () {
+        var id = (inviteUuidInput.value || "").trim();
+        var email = (inviteEmailInput && inviteEmailInput.value || "").trim().toLowerCase();
+        if (!id || id.length < 30) {
+          showSettingsMsg("Paste the user's UUID from Supabase → Authentication → Users.", true);
+          return;
+        }
+        inviteUuidBtn.disabled = true;
+        inviteUuidBtn.textContent = "Promoting…";
+        sb.from("profiles")
+          .update({ role: "dentist", email: email || undefined })
+          .eq("id", id)
           .select("id, full_name, email, role")
           .then(function (res) {
-            inviteBtn.disabled = false;
-            inviteBtn.textContent = "Promote";
+            inviteUuidBtn.disabled = false;
+            inviteUuidBtn.textContent = "Promote by UUID";
             if (res.error) {
               showSettingsMsg("Couldn't promote: " + res.error.message, true);
               return;
             }
-            var rows = res.data || [];
-            if (rows.length === 0) {
-              showSettingsMsg("No account found with that email. Ask them to sign up in the Lianko app first, then promote again.", true);
-              if (inviteHint) inviteHint.textContent = "No profile matched \"" + email + "\". They need an app account first.";
+            if (!res.data || res.data.length === 0) {
+              showSettingsMsg("No profile with that UUID (or RLS blocked the update). Create profile / run promote SQL policy.", true);
               return;
             }
-            showSettingsMsg("Success! " + (rows[0].full_name || email) + " can now sign in to this admin dashboard.", false);
-            if (inviteEmailInput) inviteEmailInput.value = "";
-            if (inviteHint) inviteHint.textContent = "Promoted " + email + " to dentist/admin.";
+            showSettingsMsg("Success! " + (res.data[0].full_name || id) + " is now dentist/admin.", false);
+            inviteUuidInput.value = "";
           });
       });
     }
