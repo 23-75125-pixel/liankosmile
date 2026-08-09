@@ -1357,12 +1357,12 @@
           <input id="invite-email" type="email" placeholder="colleague@email.com" />
           <button type="button" class="invite-btn" id="invite-btn">Promote</button>
         </div>
-        <div class="field-hint" style="margin-top:10px;margin-bottom:4px;">If email lookup fails, paste their User UUID from Supabase → Authentication → Users:</div>
+        <div class="field-hint" style="margin-top:10px;margin-bottom:4px;">Check email first before promotion</div>
         <div class="invite-row">
           <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">One-time setup: run promote_dentist_rpc.sql in Supabase. After that, Promote by email is automatic.</div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Make sure UUID is correct before promotion </div>
       </div>
 
       <div class="modal-actions">
