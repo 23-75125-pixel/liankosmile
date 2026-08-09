@@ -126,6 +126,43 @@
     display: none;
   }
 
+
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 16px;
+    color: rgba(255,255,255,.55);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .login-divider::before,
+  .login-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,.22);
+  }
+  #google-login-btn {
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 999px;
+    background: #fff;
+    color: #3c4043;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: opacity .15s, box-shadow .15s;
+  }
+  #google-login-btn:hover { opacity: .95; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  #google-login-btn:disabled { opacity: .6; cursor: default; }
+  #google-login-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
   #login-hint {
     margin-top: 18px;
     font-size: 11.5px;
@@ -1102,8 +1139,21 @@
         </div>
 
         <button id="login-btn">Login</button>
+
+        <div class="login-divider">or</div>
+
+        <button type="button" id="google-login-btn">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Continue with Google
+        </button>
+
         <div id="login-error"></div>
-        <div id="login-hint">Sign in with the dentist account set up in the Lianko app.</div>
+        <div id="login-hint">Sign in with email/password or Google using a dentist/admin account (promoted in settings).</div>
       </div>
     </div>
 
@@ -1312,7 +1362,7 @@
           <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">If promote fails, run fix_promote_admin.sql in Supabase SQL Editor (email backfill + dentist update policy).</div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">One-time setup: run promote_dentist_rpc.sql in Supabase. After that, Promote by email is automatic.</div>
       </div>
 
       <div class="modal-actions">
@@ -1476,13 +1526,15 @@
       sb.from("profiles").select("role, full_name, avatar_url, specialization").eq("id", user.id).maybeSingle()
         .then(function (res) {
           resetLoginBtn();
+          var gBtn = document.getElementById("google-login-btn");
+          if (gBtn) gBtn.disabled = false;
           if (res.error || !res.data) {
             showLoginError("Couldn't load this account's profile.");
             sb.auth.signOut();
             return;
           }
           if (res.data.role !== "dentist") {
-            showLoginError("This account isn't set up as a dentist/admin account.");
+            showLoginError("This account isn't set up as a dentist/admin account. Ask an admin to Promote your email first.");
             sb.auth.signOut();
             return;
           }
@@ -1646,6 +1698,43 @@
           renderAdminChip(currentProfile);
           showSettingsMsg("Account settings updated!", false);
         });
+    });
+
+
+    // Google OAuth login
+    var googleLoginBtn = document.getElementById("google-login-btn");
+    if (googleLoginBtn) {
+      googleLoginBtn.addEventListener("click", function () {
+        loginError.style.display = "none";
+        googleLoginBtn.disabled = true;
+        var redirectTo = window.location.origin + window.location.pathname;
+        sb.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: redirectTo,
+            queryParams: { access_type: "offline", prompt: "select_account" }
+          }
+        }).then(function (res) {
+          if (res.error) {
+            showLoginError(res.error.message || "Google sign-in failed.");
+            googleLoginBtn.disabled = false;
+          }
+          // On success the browser redirects to Google; no further action here.
+        }).catch(function (err) {
+          showLoginError(err.message || "Google sign-in failed.");
+          googleLoginBtn.disabled = false;
+        });
+      });
+    }
+
+    // After Google redirect, Supabase puts tokens in the URL hash/query.
+    // getSession() below already resumes the session; also listen for auth changes.
+    sb.auth.onAuthStateChange(function (event, session) {
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session && session.user) {
+        // Avoid double-enter if already in app
+        if (appShell && appShell.style.display === "block") return;
+        checkDentistRole(session.user);
+      }
     });
 
     // On load, resume an existing session if there is one.
@@ -1840,32 +1929,10 @@
     var inviteBtn = document.getElementById("invite-btn");
     var inviteHint = document.getElementById("invite-hint");
 
-    function promoteProfileById(profileId, email, displayName) {
-      return sb.from("profiles")
-        .update({ role: "dentist", email: email })
-        .eq("id", profileId)
-        .select("id, full_name, email, role")
-        .then(function (upd) {
-          inviteBtn.disabled = false;
-          inviteBtn.textContent = "Promote";
-          if (upd.error) {
-            showSettingsMsg("Couldn't promote: " + upd.error.message + " (If this is an RLS error, run the admin promote SQL in Supabase.)", true);
-            return;
-          }
-          var rows = upd.data || [];
-          if (rows.length === 0) {
-            showSettingsMsg(
-              "Update blocked or no row changed. In Supabase SQL Editor run: " +
-              "create policy for dentist to update profiles (see supabase/admin_promote_policy.sql).",
-              true
-            );
-            return;
-          }
-          showSettingsMsg("Success! " + (rows[0].full_name || displayName || email) + " is now a dentist/admin and can sign in here.", false);
-          if (inviteEmailInput) inviteEmailInput.value = "";
-          if (inviteHint) inviteHint.textContent = "Promoted " + email + " to dentist/admin.";
-        });
-    }
+    // Invite / promote — uses RPC promote_to_dentist (run promote_dentist_rpc.sql once)
+    var inviteEmailInput = document.getElementById("invite-email");
+    var inviteBtn = document.getElementById("invite-btn");
+    var inviteHint = document.getElementById("invite-hint");
 
     if (inviteBtn) {
       inviteBtn.addEventListener("click", function () {
@@ -1876,54 +1943,77 @@
         }
         inviteBtn.disabled = true;
         inviteBtn.textContent = "Promoting…";
-        if (inviteHint) inviteHint.textContent = "Looking up profile…";
+        if (inviteHint) inviteHint.textContent = "Promoting…";
 
-        // 1) Find by profiles.email (case-insensitive)
-        sb.from("profiles")
-          .select("id, full_name, email, role")
-          .ilike("email", email)
-          .then(function (findRes) {
-            if (findRes.error) {
-              inviteBtn.disabled = false;
-              inviteBtn.textContent = "Promote";
-              showSettingsMsg("Lookup failed: " + findRes.error.message, true);
+        sb.rpc("promote_to_dentist", { target_email: email }).then(function (res) {
+          inviteBtn.disabled = false;
+          inviteBtn.textContent = "Promote";
+
+          if (res.error) {
+            // RPC missing? fall back to direct update
+            if ((res.error.message || "").indexOf("promote_to_dentist") !== -1 ||
+                (res.error.message || "").indexOf("Could not find") !== -1) {
+              fallbackPromoteByEmail(email);
               return;
             }
-            var found = findRes.data || [];
-            if (found.length > 0) {
-              return promoteProfileById(found[0].id, email, found[0].full_name);
-            }
+            showSettingsMsg("Couldn't promote: " + res.error.message, true);
+            return;
+          }
 
-            // 2) Email column may be empty — list profiles the dentist can read and match nothing;
-            //    try ilike on full_name is useless. Fall back: fetch recent profiles and
-            //    also try exact eq in case ilike is restricted.
-            return sb.from("profiles")
-              .select("id, full_name, email, role")
-              .eq("email", email)
-              .then(function (find2) {
-                var found2 = (find2 && find2.data) || [];
-                if (found2.length > 0) {
-                  return promoteProfileById(found2[0].id, email, found2[0].full_name);
-                }
+          var data = res.data;
+          if (typeof data === "string") {
+            try { data = JSON.parse(data); } catch (e) {}
+          }
 
-                // 3) Still nothing — profile.email likely NULL. Ask user to run backfill SQL
-                //    or promote by pasting the user's UUID from Supabase Authentication.
-                inviteBtn.disabled = false;
-                inviteBtn.textContent = "Promote";
+          if (!data || data.ok === false) {
+            showSettingsMsg((data && data.error) || "Promote failed.", true);
+            if (inviteHint) inviteHint.textContent = (data && data.error) || "Promote failed.";
+            return;
+          }
+
+          showSettingsMsg(
+            "Success! " + (data.full_name || data.email || email) + " is now a dentist/admin and can sign in (email/password or Google).",
+            false
+          );
+          if (inviteEmailInput) inviteEmailInput.value = "";
+          if (inviteHint) inviteHint.textContent = "Promoted " + (data.email || email) + ". They can log in now.";
+        });
+      });
+    }
+
+    function fallbackPromoteByEmail(email) {
+      sb.from("profiles")
+        .select("id, full_name, email, role")
+        .ilike("email", email)
+        .then(function (findRes) {
+          var rows = (findRes && findRes.data) || [];
+          if (rows.length === 0) {
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = "Promote";
+            showSettingsMsg(
+              "Promote RPC not installed and no profile.email match. Run promote_dentist_rpc.sql once in Supabase SQL Editor, then try again.",
+              true
+            );
+            return;
+          }
+          sb.from("profiles")
+            .update({ role: "dentist" })
+            .eq("id", rows[0].id)
+            .select("id, full_name, email, role")
+            .then(function (upd) {
+              inviteBtn.disabled = false;
+              inviteBtn.textContent = "Promote";
+              if (upd.error || !(upd.data || []).length) {
                 showSettingsMsg(
-                  "No profile with email \"" + email + "\" found. " +
-                  "Usually the account exists in Auth but profiles.email is empty. " +
-                  "Run this in Supabase SQL Editor, then Promote again:\n" +
-                  "update public.profiles p set email = u.email from auth.users u where u.id = p.id and (p.email is null or p.email = '');",
+                  "Update failed. Run promote_dentist_rpc.sql once in Supabase SQL Editor so Promote works automatically.",
                   true
                 );
-                if (inviteHint) {
-                  inviteHint.textContent =
-                    "Tip: Supabase → SQL → run email backfill, then Promote again. Or promote by UUID below.";
-                }
-              });
-          });
-      });
+                return;
+              }
+              showSettingsMsg("Success! " + (upd.data[0].full_name || email) + " is now dentist/admin.", false);
+              if (inviteEmailInput) inviteEmailInput.value = "";
+            });
+        });
     }
 
     // Optional: promote by user UUID (from Supabase → Authentication → Users)
