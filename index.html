@@ -2035,26 +2035,71 @@
     }
 
     function updateAppointmentStatus(id, status, successTitle, successMsg) {
-      sb.from("appointments").update({ status: status }).eq("id", id).then(function (res) {
-        if (res.error) {
-          showAlertModal("error", "Update failed", res.error.message || "Couldn't update this appointment.");
-          return;
-        }
-        loadAppointments();
-        showAlertModal("success", successTitle || "Updated", successMsg || "Appointment status updated.");
-      });
+      sb.from("appointments")
+        .update({ status: status })
+        .eq("id", id)
+        .select("id, status")
+        .then(function (res) {
+          if (res.error) {
+            showAlertModal(
+              "error",
+              "Update failed",
+              (res.error.message || "Couldn't update this appointment.") +
+                " — If you are an invited admin, run FINAL_invited_admin_crud_fix.sql in Supabase once."
+            );
+            return;
+          }
+          if (!(res.data || []).length) {
+            showAlertModal(
+              "error",
+              "Update blocked",
+              "No row changed (RLS). Run FINAL_invited_admin_crud_fix.sql in Supabase SQL Editor so any dentist can manage appointments."
+            );
+            return;
+          }
+          loadAppointments();
+          showAlertModal("success", successTitle || "Updated", successMsg || "Appointment status updated.");
+        });
     }
 
     function deleteAppointment(id) {
-      if (!confirm("Delete this transaction permanently?")) return;
-      sb.from("appointments").delete().eq("id", id).then(function (res) {
-        if (res.error) {
-          showAlertModal("error", "Delete failed", res.error.message || "Couldn't delete this transaction.");
-          return;
-        }
-        loadAppointments();
-        showAlertModal("success", "Deleted", "Transaction removed successfully.");
-      });
+      function doDelete() {
+        sb.from("appointments")
+          .delete()
+          .eq("id", id)
+          .select("id")
+          .then(function (res) {
+            if (res.error) {
+              showAlertModal(
+                "error",
+                "Delete failed",
+                (res.error.message || "Couldn't delete this transaction.") +
+                  " — Invited admins: run FINAL_invited_admin_crud_fix.sql in Supabase once."
+              );
+              return;
+            }
+            if (!(res.data || []).length) {
+              showAlertModal(
+                "error",
+                "Delete blocked",
+                "No row deleted (RLS). Run FINAL_invited_admin_crud_fix.sql so any dentist can delete transactions."
+              );
+              return;
+            }
+            loadAppointments();
+            showAlertModal("success", "Deleted", "Transaction removed successfully.");
+          });
+      }
+      if (typeof showConfirmModal === "function") {
+        showConfirmModal(
+          "Delete transaction?",
+          "Are you sure you want to permanently delete this transaction?",
+          "Delete",
+          doDelete
+        );
+      } else if (confirm("Delete this transaction permanently?")) {
+        doDelete();
+      }
     }
 
     window.__liankoApprove = function (id) {
@@ -2201,7 +2246,7 @@
     var inviteBtn = document.getElementById("invite-btn");
     var inviteHint = document.getElementById("invite-hint");
 
-    // Invite / promote — uses RPC promote_to_dentist (run promote_dentist_rpc.sql once)
+    // Invite / promote — uses RPC promote_to_dentist (run FINAL_invited_admin_crud_fix.sql once)
     var inviteEmailInput = document.getElementById("invite-email");
     var inviteBtn = document.getElementById("invite-btn");
     var inviteHint = document.getElementById("invite-hint");
@@ -2263,7 +2308,7 @@
             inviteBtn.disabled = false;
             inviteBtn.textContent = "Promote";
             showSettingsMsg(
-              "Promote RPC not installed and no profile.email match. Run promote_dentist_rpc.sql once in Supabase SQL Editor, then try again.",
+              "Promote RPC not installed and no profile.email match. Run FINAL_invited_admin_crud_fix.sql once in Supabase SQL Editor, then try again.",
               true
             );
             return;
@@ -2277,7 +2322,7 @@
               inviteBtn.textContent = "Promote";
               if (upd.error || !(upd.data || []).length) {
                 showSettingsMsg(
-                  "Update failed. Run promote_dentist_rpc.sql once in Supabase SQL Editor so Promote works automatically.",
+                  "Update failed. Run FINAL_invited_admin_crud_fix.sql once in Supabase SQL Editor so Promote works automatically.",
                   true
                 );
                 return;
@@ -2417,14 +2462,53 @@
               '</div>';
             card.querySelector(".del").addEventListener("click", function () {
               if (!confirm("Delete this before & after pair?")) return;
-              sb.from("before_after_photos").delete().eq("id", row.id).then(function (delRes) {
-                if (delRes.error) {
-                  showAlertModal("error", "Delete failed", delRes.error.message);
-                  return;
-                }
-                loadGallery();
-                showAlertModal("success", "Deleted", "Gallery photo pair removed.");
-              });
+              // Prefer confirm modal style if available
+              function doDelete() {
+                // 1) Delete DB row (any dentist after FINAL_invited_admin_crud_fix.sql)
+                sb.from("before_after_photos")
+                  .delete()
+                  .eq("id", row.id)
+                  .select("id")
+                  .then(function (delRes) {
+                    if (delRes.error) {
+                      showAlertModal(
+                        "error",
+                        "Delete failed",
+                        delRes.error.message +
+                          " — If you are an invited admin, run FINAL_invited_admin_crud_fix.sql in Supabase once."
+                      );
+                      return;
+                    }
+                    var deleted = delRes.data || [];
+                    if (deleted.length === 0) {
+                      showAlertModal(
+                        "error",
+                        "Delete blocked",
+                        "No row deleted (RLS). Run FINAL_invited_admin_crud_fix.sql in Supabase SQL Editor so any dentist can delete gallery photos."
+                      );
+                      return;
+                    }
+                    // 2) Best-effort remove storage files (paths may vary)
+                    try {
+                      var paths = [];
+                      [row.before_url, row.after_url].forEach(function (url) {
+                        if (!url) return;
+                        var marker = "/before-after/";
+                        var idx = url.indexOf(marker);
+                        if (idx >= 0) {
+                          var pathPart = decodeURIComponent(url.substring(idx + marker.length).split("?")[0]);
+                          if (pathPart) paths.push(pathPart);
+                        }
+                      });
+                      if (paths.length) {
+                        sb.storage.from("before-after").remove(paths).then(function () {});
+                      }
+                    } catch (e) {}
+                    loadGallery();
+                    showAlertModal("success", "Deleted", "Gallery photo pair removed.");
+                  });
+              }
+              doDelete();
             });
             galleryList.appendChild(card);
           });
@@ -2455,12 +2539,27 @@
             before_url: urls[0],
             after_url: urls[1],
             caption: (galleryCaption.value || "").trim() || null
-          });
+          }).select("id");
         }).then(function (insRes) {
           galleryUploadBtn.disabled = false;
           galleryUploadBtn.textContent = "Upload pair";
           if (insRes.error) {
-            showGalleryMsg("Save failed: " + insRes.error.message, true);
+            var msg = insRes.error.message || "Save failed";
+            showGalleryMsg("Save failed: " + msg, true);
+            showAlertModal(
+              "error",
+              "Upload failed",
+              msg + " — Invited admins: run FINAL_invited_admin_crud_fix.sql in Supabase once."
+            );
+            return;
+          }
+          if (!(insRes.data || []).length) {
+            showGalleryMsg("Upload blocked by security policy (RLS).", true);
+            showAlertModal(
+              "error",
+              "Upload blocked",
+              "No row inserted. Run FINAL_invited_admin_crud_fix.sql in Supabase SQL Editor so any dentist can manage the gallery."
+            );
             return;
           }
           selectedBeforeFile = null;
@@ -2476,8 +2575,9 @@
         }).catch(function (err) {
           galleryUploadBtn.disabled = false;
           galleryUploadBtn.textContent = "Upload pair";
-          showGalleryMsg("Upload failed: " + (err.message || err), true);
-          showAlertModal("error", "Upload failed", err.message || String(err));
+          var msg = err.message || String(err);
+          showGalleryMsg("Upload failed: " + msg, true);
+          showAlertModal("error", "Upload failed", msg);
         });
       });
     }
