@@ -2266,7 +2266,7 @@
       statPending.textContent = pending.length;
     }
 
-   
+    
 
     // Mobile sidebar drawer
     var menuBtn = document.getElementById("menu-btn");
@@ -2540,7 +2540,7 @@
     function loadGallery() {
       if (!galleryList) return;
       sb.from("before_after_photos")
-        .select("id, before_url, after_url, caption, procedure, category, created_at")
+        .select("id, before_url, after_url, caption, created_at")
         .order("created_at", { ascending: false })
         .then(function (res) {
           if (res.error) {
@@ -2561,8 +2561,24 @@
                 '<div class="side"><span class="tag">Before</span><img src="' + escapeHtml(row.before_url) + '" alt="Before" /></div>' +
                 '<div class="side"><span class="tag">After</span><img src="' + escapeHtml(row.after_url) + '" alt="After" /></div>' +
               '</div>' +
-              (row.category ? '<div class="proc-cat">' + escapeHtml(row.category) + '</div>' : '') +
-              (row.procedure ? '<span class="proc-badge">' + escapeHtml(row.procedure) + '</span>' : '') +
+              (function () {
+                var cat = row.category || "";
+                var proc = row.procedure || "";
+                var cap = row.caption || "";
+                if (!cat && !proc && cap) {
+                  var parts = cap.split(" — ");
+                  if (parts.length >= 2) {
+                    cat = parts[0];
+                    var rest = parts.slice(1).join(" — ");
+                    var sub = rest.split(" · ");
+                    proc = sub[0] || rest;
+                  }
+                }
+                var html = "";
+                if (cat) html += '<div class="proc-cat">' + escapeHtml(cat) + '</div>';
+                if (proc) html += '<span class="proc-badge">' + escapeHtml(proc) + '</span>';
+                return html;
+              })() +
               '<div class="meta">' +
                 '<div class="cap">' + escapeHtml(row.caption || "Smile transformation") + '</div>' +
                 '<button type="button" class="del" data-id="' + row.id + '">Delete</button>' +
@@ -2649,13 +2665,12 @@
         ]).then(function (urls) {
           var extraCap = (galleryCaption && galleryCaption.value || "").trim();
           var captionText = category + " — " + procedure + (extraCap ? " · " + extraCap : "");
+          // Prefer new columns if they exist; always set caption for app compatibility
           return sb.from("before_after_photos").insert({
             dentist_id: currentProfile.id,
             before_url: urls[0],
             after_url: urls[1],
-            caption: captionText,
-            procedure: procedure,
-            category: category
+            caption: captionText
           }).select("id");
         }).then(function (insRes) {
           galleryUploadBtn.disabled = false;
