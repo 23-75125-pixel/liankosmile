@@ -1557,6 +1557,36 @@
         <div class="field-hint">Separate multiple specializations with a comma.</div>
       </div>
 
+      <div class="modal-field">
+        <label for="settings-contact">Contact number</label>
+        <input id="settings-contact" type="text" placeholder="09XXXXXXXXX" />
+      </div>
+
+      <div class="modal-field">
+        <label for="settings-clinic-name">Clinic name</label>
+        <input id="settings-clinic-name" type="text" placeholder="Lianko Smile Dental Clinic" />
+      </div>
+
+      <div class="modal-field">
+        <label for="settings-clinic-address">Clinic address / location</label>
+        <input id="settings-clinic-address" type="text" placeholder="Firaza Building, Ziga Avenue" />
+      </div>
+
+      <div class="modal-field">
+        <label for="settings-clinic-city">City</label>
+        <input id="settings-clinic-city" type="text" placeholder="Tabaco City" />
+      </div>
+
+      <div class="modal-field">
+        <label for="settings-clinic-hours">Clinic hours</label>
+        <input id="settings-clinic-hours" type="text" placeholder="Mon–Sat 9:00 AM – 5:00 PM" />
+      </div>
+
+      <div class="modal-field">
+        <label for="settings-about">About the dentist / clinic</label>
+        <textarea id="settings-about" placeholder="Short bio or clinic description shown to patients…"></textarea>
+      </div>
+
       <div class="modal-field" style="margin-top:8px;padding:12px 14px;background:#F7F1FA;border-radius:10px;">
         <div style="font-size:12.5px;font-weight:700;color:var(--purple-dark);margin-bottom:4px;">Client before &amp; after photos</div>
         <div class="field-hint" style="margin:0;">Upload teeth procedure photos from the <strong>Gallery</strong> page in the sidebar. They show on every patient&rsquo;s Home overview in the app.</div>
@@ -1623,6 +1653,12 @@
     var settingsName = document.getElementById("settings-name");
     var settingsEmail = document.getElementById("settings-email");
     var settingsSpecialization = document.getElementById("settings-specialization");
+    var settingsContact = document.getElementById("settings-contact");
+    var settingsClinicName = document.getElementById("settings-clinic-name");
+    var settingsClinicAddress = document.getElementById("settings-clinic-address");
+    var settingsClinicCity = document.getElementById("settings-clinic-city");
+    var settingsClinicHours = document.getElementById("settings-clinic-hours");
+    var settingsAbout = document.getElementById("settings-about");
     var settingsAvatar = document.getElementById("settings-avatar");
     var settingsAvatarInitials = document.getElementById("settings-avatar-initials");
     var settingsAvatarCaption = document.getElementById("settings-avatar-caption");
@@ -1820,7 +1856,7 @@
     var showLoginSuccessModal = false;
 
     function checkDentistRole(user) {
-      sb.from("profiles").select("role, full_name, avatar_url, specialization").eq("id", user.id).maybeSingle()
+      sb.from("profiles").select("role, full_name, email, avatar_url, specialization, contact_number, clinic_name, clinic_address, clinic_city, clinic_hours, about").eq("id", user.id).maybeSingle()
         .then(function (res) {
           resetLoginBtn();
           var gBtn = document.getElementById("google-login-btn");
@@ -1914,6 +1950,12 @@
       settingsName.value = currentProfile.full_name || "";
       settingsEmail.value = currentProfile.email || "";
       settingsSpecialization.value = currentProfile.specialization || "";
+      if (settingsContact) settingsContact.value = currentProfile.contact_number || "";
+      if (settingsClinicName) settingsClinicName.value = currentProfile.clinic_name || "Lianko Smile Dental Clinic";
+      if (settingsClinicAddress) settingsClinicAddress.value = currentProfile.clinic_address || "Firaza Building, Ziga Avenue";
+      if (settingsClinicCity) settingsClinicCity.value = currentProfile.clinic_city || "Tabaco City";
+      if (settingsClinicHours) settingsClinicHours.value = currentProfile.clinic_hours || "";
+      if (settingsAbout) settingsAbout.value = currentProfile.about || "";
       renderSettingsAvatar();
       settingsOverlay.classList.add("open");
     }
@@ -1999,7 +2041,13 @@
     settingsSave.addEventListener("click", function () {
       if (!currentProfile) return;
       var newName = settingsName.value.trim();
-      var newSpecialization = settingsSpecialization.value.trim();
+      var newSpecialization = (settingsSpecialization && settingsSpecialization.value || "").trim();
+      var newContact = (settingsContact && settingsContact.value || "").trim();
+      var newClinicName = (settingsClinicName && settingsClinicName.value || "").trim();
+      var newClinicAddress = (settingsClinicAddress && settingsClinicAddress.value || "").trim();
+      var newClinicCity = (settingsClinicCity && settingsClinicCity.value || "").trim();
+      var newClinicHours = (settingsClinicHours && settingsClinicHours.value || "").trim();
+      var newAbout = (settingsAbout && settingsAbout.value || "").trim();
 
       if (!newName) {
         showSettingsMsg("Full name can't be empty.", true);
@@ -2009,21 +2057,50 @@
       settingsSave.disabled = true;
       settingsSave.textContent = "Saving…";
 
+      var payload = {
+        full_name: newName,
+        specialization: newSpecialization || null,
+        contact_number: newContact || null,
+        clinic_name: newClinicName || null,
+        clinic_address: newClinicAddress || null,
+        clinic_city: newClinicCity || null,
+        clinic_hours: newClinicHours || null,
+        about: newAbout || null
+      };
+
       sb.from("profiles")
-        .update({ full_name: newName, specialization: newSpecialization })
+        .update(payload)
         .eq("id", currentProfile.id)
+        .select("id")
         .then(function (res) {
           settingsSave.disabled = false;
           settingsSave.textContent = "Save changes";
           if (res.error) {
-            showSettingsMsg("Couldn't save changes: " + res.error.message, true);
+            showSettingsMsg(
+              "Couldn't save: " + res.error.message +
+              " — Run dentist_profile_fields.sql in Supabase once if columns are missing.",
+              true
+            );
+            showAlertModal("error", "Save failed", res.error.message || "Update failed.");
+            return;
+          }
+          if (!(res.data || []).length) {
+            showSettingsMsg("Save blocked by security policy (RLS).", true);
+            showAlertModal("error", "Save blocked", "No row updated. Check dentist role / RLS.");
             return;
           }
           currentProfile.full_name = newName;
           currentProfile.specialization = newSpecialization;
+          currentProfile.contact_number = newContact;
+          currentProfile.clinic_name = newClinicName;
+          currentProfile.clinic_address = newClinicAddress;
+          currentProfile.clinic_city = newClinicCity;
+          currentProfile.clinic_hours = newClinicHours;
+          currentProfile.about = newAbout;
           renderSettingsAvatar();
           renderAdminChip(currentProfile);
-          showSettingsMsg("Account settings updated!", false);
+          showSettingsMsg("Account settings updated! Patients will see clinic location on Home.", false);
+          showAlertModal("success", "Saved", "Dentist profile and clinic details updated.");
         });
     });
 
