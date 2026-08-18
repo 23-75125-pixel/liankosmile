@@ -1021,6 +1021,54 @@
   }
   .gallery-file-box .label-title { font-size: 13px; font-weight: 700; color: var(--text-main); }
   .gallery-file-box .label-sub { font-size: 11.5px; color: var(--text-sub); }
+
+  .gallery-procedure-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .gallery-procedure-row label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+  .gallery-procedure-row select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: #fff;
+    outline: none;
+    color: var(--text-main);
+  }
+  .gallery-procedure-row select:focus { border-color: var(--purple-light); }
+  @media (max-width: 620px) {
+    .gallery-procedure-row { grid-template-columns: 1fr; }
+  }
+  .gallery-card .proc-badge {
+    display: inline-block;
+    margin: 0 12px 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #F7F1FA;
+    color: var(--purple-dark);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .gallery-card .proc-cat {
+    display: block;
+    margin: 8px 12px 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
   .gallery-caption-row { margin-top: 16px; }
   .gallery-caption-row label {
     display: block;
@@ -1424,9 +1472,26 @@
                 <input type="file" id="after-file" accept="image/*" style="display:none" />
               </div>
             </div>
+            <div class="gallery-procedure-row">
+              <div>
+                <label for="gallery-category">Procedure category *</label>
+                <select id="gallery-category">
+                  <option value="">Select category…</option>
+                  <option value="General Dentistry">General Dentistry</option>
+                  <option value="Prosthodontist">Prosthodontist</option>
+                  <option value="Orthodontist">Orthodontist</option>
+                </select>
+              </div>
+              <div>
+                <label for="gallery-procedure">Procedure done *</label>
+                <select id="gallery-procedure" disabled>
+                  <option value="">Select procedure…</option>
+                </select>
+              </div>
+            </div>
             <div class="gallery-caption-row">
-              <label for="gallery-caption">Caption (optional)</label>
-              <input id="gallery-caption" type="text" placeholder="e.g. Teeth cleaning &amp; whitening — March 2026" />
+              <label for="gallery-caption">Extra caption (optional)</label>
+              <input id="gallery-caption" type="text" placeholder="e.g. Patient result — March 2026" />
             </div>
             <div class="gallery-actions">
               <button class="gallery-upload-btn" id="gallery-upload-btn" type="button">Upload pair</button>
@@ -1504,12 +1569,12 @@
           <input id="invite-email" type="email" placeholder="colleague@email.com" />
           <button type="button" class="invite-btn" id="invite-btn">Promote</button>
         </div>
-        <div class="field-hint" style="margin-top:10px;margin-bottom:4px;">Check email first before promotion</div>
+        <div class="field-hint" style="margin-top:10px;margin-bottom:4px;">If email lookup fails, paste their User UUID from Supabase → Authentication → Users:</div>
         <div class="invite-row">
           <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Make sure UUID is correct before promotion</div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">One-time setup: run FINAL_invited_admin_crud_fix.sql in Supabase. After that, Promote by email is automatic.</div>
       </div>
 
       <div class="modal-actions">
@@ -2201,7 +2266,7 @@
       statPending.textContent = pending.length;
     }
 
-    
+   
 
     // Mobile sidebar drawer
     var menuBtn = document.getElementById("menu-btn");
@@ -2373,7 +2438,47 @@
     var beforeBox = document.getElementById("before-box");
     var afterBox = document.getElementById("after-box");
     var galleryCaption = document.getElementById("gallery-caption");
+    var galleryCategory = document.getElementById("gallery-category");
+    var galleryProcedure = document.getElementById("gallery-procedure");
     var galleryUploadBtn = document.getElementById("gallery-upload-btn");
+
+    var PROCEDURE_OPTIONS = {
+      "General Dentistry": [
+        "Tooth Filling (Cavity Treatment)",
+        "Dental Cleaning (Prophylaxis)",
+        "Dental Checkup",
+        "Tooth Extraction",
+        "Root Canal Treatment",
+        "Teeth Whitening"
+      ],
+      "Prosthodontist": [
+        "Dental Crown (Upper Front Tooth)",
+        "Dental Crown",
+        "Dentures",
+        "Dental Bridge",
+        "Veneers"
+      ],
+      "Orthodontist": [
+        "Braces (Orthodontic Treatment)",
+        "Braces Adjustment",
+        "Retainer",
+        "Clear Aligners"
+      ]
+    };
+
+    if (galleryCategory && galleryProcedure) {
+      galleryCategory.addEventListener("change", function () {
+        var cat = galleryCategory.value;
+        galleryProcedure.innerHTML = '<option value="">Select procedure…</option>';
+        galleryProcedure.disabled = !cat;
+        (PROCEDURE_OPTIONS[cat] || []).forEach(function (p) {
+          var opt = document.createElement("option");
+          opt.value = p;
+          opt.textContent = p;
+          galleryProcedure.appendChild(opt);
+        });
+      });
+    }
     var galleryMsg = document.getElementById("gallery-msg");
     var galleryList = document.getElementById("gallery-list");
     var selectedBeforeFile = null;
@@ -2435,7 +2540,7 @@
     function loadGallery() {
       if (!galleryList) return;
       sb.from("before_after_photos")
-        .select("id, before_url, after_url, caption, created_at")
+        .select("id, before_url, after_url, caption, procedure, category, created_at")
         .order("created_at", { ascending: false })
         .then(function (res) {
           if (res.error) {
@@ -2456,6 +2561,8 @@
                 '<div class="side"><span class="tag">Before</span><img src="' + escapeHtml(row.before_url) + '" alt="Before" /></div>' +
                 '<div class="side"><span class="tag">After</span><img src="' + escapeHtml(row.after_url) + '" alt="After" /></div>' +
               '</div>' +
+              (row.category ? '<div class="proc-cat">' + escapeHtml(row.category) + '</div>' : '') +
+              (row.procedure ? '<span class="proc-badge">' + escapeHtml(row.procedure) + '</span>' : '') +
               '<div class="meta">' +
                 '<div class="cap">' + escapeHtml(row.caption || "Smile transformation") + '</div>' +
                 '<button type="button" class="del" data-id="' + row.id + '">Delete</button>' +
@@ -2525,6 +2632,12 @@
           showGalleryMsg("Choose both a before and an after photo.", true);
           return;
         }
+        var category = (galleryCategory && galleryCategory.value) || "";
+        var procedure = (galleryProcedure && galleryProcedure.value) || "";
+        if (!category || !procedure) {
+          showGalleryMsg("Select the procedure category and the procedure done.", true);
+          return;
+        }
         galleryUploadBtn.disabled = true;
         galleryUploadBtn.textContent = "Uploading…";
         showGalleryMsg("Uploading photos…", false);
@@ -2534,11 +2647,15 @@
           uploadImageToBucket(selectedBeforeFile, folder),
           uploadImageToBucket(selectedAfterFile, folder)
         ]).then(function (urls) {
+          var extraCap = (galleryCaption && galleryCaption.value || "").trim();
+          var captionText = category + " — " + procedure + (extraCap ? " · " + extraCap : "");
           return sb.from("before_after_photos").insert({
             dentist_id: currentProfile.id,
             before_url: urls[0],
             after_url: urls[1],
-            caption: (galleryCaption.value || "").trim() || null
+            caption: captionText,
+            procedure: procedure,
+            category: category
           }).select("id");
         }).then(function (insRes) {
           galleryUploadBtn.disabled = false;
@@ -2569,6 +2686,11 @@
           setFilePreview(beforeBox, null);
           setFilePreview(afterBox, null);
           galleryCaption.value = "";
+          if (galleryCategory) galleryCategory.value = "";
+          if (galleryProcedure) {
+            galleryProcedure.innerHTML = '<option value="">Select procedure…</option>';
+            galleryProcedure.disabled = true;
+          }
           showGalleryMsg("Uploaded! Patients will see this on their Home overview.", false);
           showAlertModal("success", "Uploaded", "Before & after photos saved. Patients will see them on Home.");
           loadGallery();
