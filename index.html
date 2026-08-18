@@ -1604,7 +1604,7 @@
           <input id="invite-uuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           <button type="button" class="invite-btn" id="invite-uuid-btn">Promote by UUID</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;" id="invite-hint">Make sure UUID is correct</div>
+        <div class="field-hint" style="margin-top:8px;" id="invite-hint">One-time setup: run FINAL_invited_admin_crud_fix.sql in Supabase. After that, Promote by email is automatic.</div>
       </div>
 
       <div class="modal-actions">
@@ -1855,34 +1855,107 @@
 
     var showLoginSuccessModal = false;
 
+    function metaName(user) {
+      var m = user.user_metadata || {};
+      return m.full_name || m.name || m.fullName || (user.email ? user.email.split("@")[0] : "") || "";
+    }
+
+    function metaAvatar(user) {
+      var m = user.user_metadata || {};
+      return m.avatar_url || m.picture || "";
+    }
+
+    /** Load profile; if columns missing or row missing, recover for Google users. */
     function checkDentistRole(user) {
-      sb.from("profiles").select("role, full_name, email, avatar_url, specialization, contact_number, clinic_name, clinic_address, clinic_city, clinic_hours, about").eq("id", user.id).maybeSingle()
-        .then(function (res) {
-          resetLoginBtn();
-          var gBtn = document.getElementById("google-login-btn");
-          if (gBtn) gBtn.disabled = false;
-          if (res.error || !res.data) {
-            showLoginError("Couldn't load this account's profile.");
-            sb.auth.signOut();
+      var fullCols = "role, full_name, email, avatar_url, specialization, contact_number, clinic_name, clinic_address, clinic_city, clinic_hours, about";
+      var baseCols = "role, full_name, email, avatar_url, specialization";
+
+      function finishOk(data) {
+        resetLoginBtn();
+        var gBtn = document.getElementById("google-login-btn");
+        if (gBtn) gBtn.disabled = false;
+        if (!data || data.role !== "dentist") {
+          showLoginError("This account isn't set up as a dentist/admin account. Ask an admin to Promote your email first, then try Google login again.");
+          sb.auth.signOut();
+          return;
+        }
+        data.id = user.id;
+        data.email = user.email || data.email || "";
+        if (showLoginSuccessModal) {
+          showLoginSuccessModal = false;
+          showAlertModal("success", "Login successful!", "Welcome back" + (data.full_name ? ", " + data.full_name : "") + ".", function () {
+            enterApp(data);
+          });
+        } else {
+          enterApp(data);
+        }
+      }
+
+      function finishFail(msg) {
+        resetLoginBtn();
+        var gBtn = document.getElementById("google-login-btn");
+        if (gBtn) gBtn.disabled = false;
+        showLoginError(msg || "Couldn't load this account's profile.");
+        sb.auth.signOut();
+      }
+
+      function ensureProfileRow(thenFn) {
+        var payload = {
+          id: user.id,
+          email: (user.email || "").toLowerCase(),
+          full_name: metaName(user) || null,
+          avatar_url: metaAvatar(user) || null,
+          role: "patient"
+        };
+        sb.from("profiles").upsert(payload, { onConflict: "id" }).select(baseCols).maybeSingle()
+          .then(function (up) {
+            if (up.error) {
+              // insert-only fallback
+              sb.from("profiles").insert(payload).select(baseCols).maybeSingle()
+                .then(function (ins) {
+                  if (ins.error && !ins.data) {
+                    finishFail(
+                      "No profile for this Google account. Sign up once in the Lianko app, ask an admin to Promote your email, then try again. (" +
+                      (ins.error.message || up.error.message) + ")"
+                    );
+                    return;
+                  }
+                  thenFn(ins.data || payload);
+                });
+              return;
+            }
+            thenFn(up.data || payload);
+          });
+      }
+
+      function afterLoad(res, usedCols) {
+        if (res.error) {
+          var msg = (res.error.message || "").toLowerCase();
+          // Missing clinic_* columns → retry with base columns
+          if (usedCols === fullCols && (msg.indexOf("column") >= 0 || msg.indexOf("schema cache") >= 0)) {
+            sb.from("profiles").select(baseCols).eq("id", user.id).maybeSingle()
+              .then(function (res2) { afterLoad(res2, baseCols); });
             return;
           }
-          if (res.data.role !== "dentist") {
-            showLoginError("This account isn't set up as a dentist/admin account. Ask an admin to Promote your email first.");
-            sb.auth.signOut();
-            return;
-          }
-          res.data.id = user.id;
-          res.data.email = user.email || "";
-          var profileData = res.data;
-          if (showLoginSuccessModal) {
-            showLoginSuccessModal = false;
-            showAlertModal("success", "Login successful!", "Welcome back" + (profileData.full_name ? ", " + profileData.full_name : "") + ".", function () {
-              enterApp(profileData);
-            });
-          } else {
-            enterApp(profileData);
-          }
-        });
+          finishFail("Couldn't load profile: " + res.error.message);
+          return;
+        }
+        if (!res.data) {
+          // Google first login — create profile row then fail role check with clear message
+          ensureProfileRow(function (row) {
+            if (row && row.role === "dentist") {
+              finishOk(row);
+            } else {
+              finishFail("Google account linked, but this email is not a dentist/admin yet. Ask an existing admin to Promote: " + (user.email || "") + " then log in again.");
+            }
+          });
+          return;
+        }
+        finishOk(res.data);
+      }
+
+      sb.from("profiles").select(fullCols).eq("id", user.id).maybeSingle()
+        .then(function (res) { afterLoad(res, fullCols); });
     }
 
     function renderAdminChip(profile) {
